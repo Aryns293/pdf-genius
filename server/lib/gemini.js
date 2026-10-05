@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-const modelNames = ['gemini-2.0-flash', 'gemini-2.5-pro', 'gemini-2.5-flash'];
+const modelNames = ['gemini-3.8-flash', 'gemini-3.5-flash'];
 let genAI;
 
 function getGenAI() {

@@ -1,7 +1,7 @@
 import express from 'express';
 import { authenticate } from '../middleware/auth.js';
-import { generateEmbedding, generateResponse } from '../lib/gemini.js';
-import { queryVectors } from '../lib/pinecone.js';
+import { generateResponse } from '../lib/gemini.js';
+import { searchRecords } from '../lib/pinecone.js';
 
 const router = express.Router();
 
@@ -13,8 +13,7 @@ router.post('/', authenticate, async (req, res) => {
     if (!question || typeof question !== 'string') return res.status(400).json({ error: 'Question is required' });
     if (question.trim().length === 0) return res.status(400).json({ error: 'Question cannot be empty' });
 
-    const embedding = await generateEmbedding(question);
-    const relevantChunks = await queryVectors(embedding, userId, 5);
+    const relevantChunks = await searchRecords(question, userId, 5);
 
     if (relevantChunks.length === 0) {
       return res.status(404).json({ error: 'No relevant content found. Please upload a PDF document first.' });

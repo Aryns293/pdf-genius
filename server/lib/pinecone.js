@@ -1,11 +1,23 @@
 import { Pinecone } from '@pinecone-database/pinecone';
 
-const pinecone = new Pinecone({ apiKey: process.env.PINECONE_API_KEY });
-const indexName = process.env.PINECONE_INDEX_NAME;
+let pinecone;
+
+function getPineconeClient() {
+  if (!process.env.PINECONE_API_KEY) {
+    throw new Error('Missing Pinecone API key');
+  }
+  if (!pinecone) {
+    pinecone = new Pinecone({ apiKey: process.env.PINECONE_API_KEY });
+  }
+  return pinecone;
+}
 
 async function getIndex() {
   try {
-    return pinecone.Index(indexName);
+    if (!process.env.PINECONE_INDEX_NAME) {
+      throw new Error('Missing Pinecone index name');
+    }
+    return getPineconeClient().Index(process.env.PINECONE_INDEX_NAME);
   } catch (error) {
     console.error('Error getting Pinecone index:', error);
     throw new Error('Failed to get Pinecone index');

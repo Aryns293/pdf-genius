@@ -2,8 +2,7 @@ import express from 'express';
 import multer from 'multer';
 import { authenticate } from '../middleware/auth.js';
 import { processPDFToChunks, generateChunkId, validatePDFBuffer } from '../lib/pdfProcessor.js';
-import { generateEmbeddings } from '../lib/gemini.js';
-import { upsertVectors } from '../lib/pinecone.js';
+import { upsertRecords } from '../lib/pinecone.js';
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -11,7 +10,6 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 
 router.post('/', authenticate, upload.single('file'), async (req, res) => {
   console.log('📤 Upload API called');
   try {
-    if (!process.env.GOOGLE_API_KEY) return res.status(500).json({ error: 'Server configuration error: Missing Google API key' });
     if (!process.env.PINECONE_API_KEY) return res.status(500).json({ error: 'Server configuration error: Missing Pinecone API key' });
 
     const file = req.file;
@@ -49,26 +47,10 @@ router.post('/', authenticate, upload.single('file'), async (req, res) => {
       },
     }));
 
-    let embeddings;
     try {
-      embeddings = await generateEmbeddings(pdfChunks.map((c) => c.text));
+      await upsertRecords(pdfChunks);
     } catch (error) {
-      console.error('❌ Embedding generation failed:', error);
-      return res.status(500).json({ 
-        error: 'Failed to generate embeddings', 
-        details: error.message, // ✅ This will now show the REAL error
-        possibleCauses: [
-          'Google Gemini API quota exceeded',
-          'Invalid GOOGLE_API_KEY in .env',
-          'Network connection issue'
-        ]
-      });
-    }
-
-    try {
-      await upsertVectors(pdfChunks, embeddings);
-    } catch (error) {
-      return res.status(500).json({ error: 'Failed to store vectors in database', details: error.message });
+      return res.status(500).json({ error: 'Failed to store PDF records in database', details: error.message });
     }
 
     const stats = {

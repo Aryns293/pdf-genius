@@ -15,7 +15,7 @@ export default function Header() {
     if (!user) return;
     setIsLoading(true);
     try {
-      const response = await fetch('/api/files');
+      const response = await fetch(`${import.meta.env.VITE_API_URL || ""}/api/files`);
       if (response.ok) {
         const data = await response.json();
         setFileStats({ count: data.count || 0, totalChunks: data.totalChunks || 0 });

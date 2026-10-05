@@ -18,7 +18,7 @@ export default function Home() {
 
   const fetchUserFiles = async () => {
     try {
-      const response = await fetch('/api/files');
+      const response = await fetch(`${import.meta.env.VITE_API_URL || ""}/api/files`);
       if (response.ok) {
         const data = await response.json();
         setUploadedFiles(data.files || []);
@@ -40,7 +40,7 @@ export default function Home() {
   const handleDeleteFile = async (fileName) => {
     if (!confirm(`Are you sure you want to delete "${fileName}"? This action cannot be undone.`)) return;
     try {
-      const response = await fetch(`/api/files?fileName=${encodeURIComponent(fileName)}`, { method: 'DELETE' });
+      const response = await fetch(`${import.meta.env.VITE_API_URL || ""}/api/files?fileName=${encodeURIComponent(fileName)}`, { method: 'DELETE' });
       if (response.ok) {
         setUploadedFiles((prev) => prev.filter((n) => n !== fileName));
         setFileStats((prev) => ({ count: Math.max(0, prev.count - 1), totalChunks: Math.max(0, prev.totalChunks - 1) }));

@@ -8,7 +8,7 @@ export function AuthProvider({ children }) {
 
   const fetchUser = async () => {
     try {
-      const res = await fetch('/api/auth/me');
+      const res = await fetch(`${import.meta.env.VITE_API_URL || ""}/api/auth/me`);
       if (res.ok) {
         const data = await res.json();
         setUser(data.user);
@@ -27,11 +27,11 @@ export function AuthProvider({ children }) {
   }, []);
 
   const signIn = () => {
-    window.location.href = '/api/auth/google';
+    window.location.href = `${import.meta.env.VITE_API_URL || ""}/api/auth/google`;
   };
 
   const signOut = async () => {
-    await fetch('/api/auth/logout', { method: 'POST' });
+    await fetch(`${import.meta.env.VITE_API_URL || ""}/api/auth/logout`, { method: 'POST' });
     setUser(null);
     window.location.href = '/';
   };

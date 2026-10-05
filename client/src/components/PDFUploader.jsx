@@ -35,7 +35,7 @@ export default function PDFUploader({ onUploadSuccess, onUploadError }) {
       formData.append('file', file);
 
       try {
-        const response = await fetch('/api/upload', { method: 'POST', body: formData });
+        const response = await fetch(`${import.meta.env.VITE_API_URL || ""}/api/upload`, { method: 'POST', body: formData });
         const contentType = response.headers.get('content-type');
 
         if (!contentType || !contentType.includes('application/json')) {

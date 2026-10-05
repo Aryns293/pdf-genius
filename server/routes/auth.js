@@ -2,13 +2,26 @@ import express from 'express';
 import passport from 'passport';
 import jwt from 'jsonwebtoken';
 import { authenticate } from '../middleware/auth.js';
+import { isGoogleAuthConfigured } from '../config/passport.js';
 
 const router = express.Router();
 
-router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'], session: false }));
+function requireGoogleAuthConfig(_req, res, next) {
+  if (!isGoogleAuthConfigured) {
+    return res.status(500).json({ error: 'Google OAuth is not configured on the server.' });
+  }
+  next();
+}
+
+router.get(
+  '/google',
+  requireGoogleAuthConfig,
+  passport.authenticate('google', { scope: ['profile', 'email'], session: false })
+);
 
 router.get(
   '/google/callback',
+  requireGoogleAuthConfig,
   passport.authenticate('google', { session: false, failureRedirect: `${process.env.CLIENT_URL}/login` }),
   (req, res) => {
     const token = jwt.sign(

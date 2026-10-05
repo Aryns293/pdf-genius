@@ -1,8 +1,17 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
-const embeddingModel = genAI.getGenerativeModel({ model: 'text-embedding-004' });
 const modelNames = ['gemini-2.0-flash', 'gemini-2.5-pro', 'gemini-2.5-flash'];
+let genAI;
+
+function getGenAI() {
+  if (!process.env.GOOGLE_API_KEY) {
+    throw new Error('Missing Google API key');
+  }
+  if (!genAI) {
+    genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
+  }
+  return genAI;
+}
 
 async function retryWithBackoff(fn, maxRetries = 3, baseDelay = 1000) {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -24,7 +33,7 @@ async function generateWithFallback(operation) {
   let lastError = null;
   for (const modelName of modelNames) {
     try {
-      const model = genAI.getGenerativeModel({ model: modelName });
+      const model = getGenAI().getGenerativeModel({ model: modelName });
       console.log(`Trying model: ${modelName}`);
       return await retryWithBackoff(() => operation(model));
     } catch (err) {
@@ -37,6 +46,7 @@ async function generateWithFallback(operation) {
 
 export async function generateEmbedding(text) {
   try {
+    const embeddingModel = getGenAI().getGenerativeModel({ model: 'text-embedding-004' });
     const result = await embeddingModel.embedContent(text);
     return result.embedding.values;
   } catch (error) {

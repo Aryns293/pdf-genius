@@ -18,6 +18,36 @@ Built by **Aryan Sharma**.
 - **Backend:** Node.js, Express, Passport.js (Google OAuth)
 - **AI & Vector DB:** Google Generative AI (Gemini `text-embedding-004` & `gemini-2.5-flash`), Pinecone Vector Database
 - **Processing:** `pdf-parse` for text extraction and intelligent chunking
+- **Hosting:** Vercel (static frontend + Express as a serverless function)
+
+**Live site:** https://pdf-genius-theta.vercel.app
+
+---
+
+## 📁 Project Structure
+
+```
+pdf-genius/
+├── api/
+│   └── index.js              # Vercel serverless entry — re-exports the Express app
+├── client/                   # React + Vite frontend
+│   ├── src/
+│   │   ├── components/       # ChatInterface, Header, PDFUploader, icons
+│   │   ├── context/          # AuthContext (session state, Google sign-in/out)
+│   │   ├── pages/            # Home, Login
+│   │   ├── App.jsx
+│   │   └── main.jsx
+│   └── vite.config.js        # Dev server on :5173, proxies /api → :5001
+├── server/                   # Express backend (also runs as a serverless function)
+│   ├── config/passport.js    # Google OAuth strategy (registered only when env vars are set)
+│   ├── lib/                  # gemini.js, pdfProcessor.js, pinecone.js
+│   ├── middleware/auth.js    # JWT cookie verification
+│   ├── routes/               # auth.js, upload.js, query.js, files.js
+│   ├── env.js                # dotenv loader
+│   └── server.js             # Express app (listens on :5001 locally; skipped on Vercel)
+├── vercel.json               # Rewrites: /api/* → api/index.js, /* → client/dist/index.html
+└── package.json              # Root scripts: build (client) and start (server)
+```
 
 ---
 
@@ -82,41 +112,99 @@ Visit `http://localhost:5173` in your browser!
 
 ---
 
-## 🌍 Deployment Guide
+## 🌍 Deployment Guide (Vercel)
 
-To deploy this application to production, you will need to host the Frontend and Backend separately (or together on a VPS). Here is the recommended approach using **Render** for the backend and **Vercel** for the frontend.
+The entire app — frontend **and** backend — is deployed on **Vercel** as a single project. There is no separate backend host.
 
-### Step 1: Deploy the Backend (Render or Railway)
-1. Push your code to GitHub.
-2. Go to [Render](https://render.com) and create a new **Web Service**.
-3. Connect your GitHub repository.
-4. Set the Root Directory to `server`.
-5. Set the Build Command to `npm install`.
-6. Set the Start Command to `npm start`.
-7. Add all the Environment Variables from your `.env` file.
-   - **Important:** Change `CLIENT_URL` to the URL where your frontend will be hosted (e.g., `https://pdf-genius.vercel.app`).
-   - **Important:** Change `GOOGLE_CALLBACK_URL` to `https://your-backend-url.onrender.com/api/auth/google/callback`.
-8. Deploy! Copy the backend URL provided by Render.
+### How it works
 
-### Step 2: Update Google Cloud Console
-1. Go to your Google Cloud Console where you created your OAuth credentials.
-2. Under **Authorized redirect URIs**, add your new production callback URL: `https://your-backend-url.onrender.com/api/auth/google/callback`.
+`vercel.json` wires everything together:
 
-### Step 3: Deploy the Frontend (Vercel)
-1. Go to [Vercel](https://vercel.com) and create a new project.
-2. Connect your GitHub repository.
-3. Set the Root Directory to `client`.
-4. Vercel will automatically detect that it's a Vite project.
-5. **CRITICAL STEP:** Since Vercel doesn't use `vite.config.js` proxies in production, you need to point your frontend to your deployed backend. 
-   - You will need to update your API calls in the frontend to point to your new backend URL instead of relative paths (`/api/...`).
-   - *Tip:* You can use an environment variable in Vercel like `VITE_API_URL=https://your-backend-url.onrender.com` and prepend it to all `fetch()` requests in the frontend.
-6. Deploy!
+```json
+{
+  "version": 2,
+  "buildCommand": "npm run build",
+  "outputDirectory": "client/dist",
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/index.js" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
+```
+
+- The root `npm run build` installs client dependencies and builds the Vite app into `client/dist` (served as static files).
+- Every `/api/*` request is rewritten to `api/index.js`, which re-exports the Express app from `server/server.js` and runs it as a **serverless function**.
+- All other routes fall through to `index.html` (SPA client-side routing).
+- Because the API is same-origin in production, the frontend uses relative `/api/...` paths — no `VITE_API_URL` is needed.
+- `server/server.js` skips `app.listen()` when `VERCEL=1`, so the same Express code works locally and on Vercel.
+
+### Step 1: Deploy to Vercel
+
+Via the dashboard or CLI:
+
+```bash
+npm i -g vercel
+vercel link          # link to the "pdf-genius" project (first time only)
+vercel --prod        # deploy to production
+```
+
+Pushes to `main` on GitHub also trigger automatic production deployments.
+
+### Step 2: Set Environment Variables
+
+Add these in **Vercel → Project → Settings → Environment Variables** (Production scope). They mirror `server/.env` but with production URLs:
+
+| Variable | Production value |
+|---|---|
+| `NODE_ENV` | `production` |
+| `CLIENT_URL` | `https://pdf-genius-theta.vercel.app` |
+| `GOOGLE_CALLBACK_URL` | `https://pdf-genius-theta.vercel.app/api/auth/google/callback` |
+| `GOOGLE_CLIENT_ID` | *(from Google Cloud Console)* |
+| `GOOGLE_CLIENT_SECRET` | *(from Google Cloud Console — mark as Sensitive)* |
+| `JWT_SECRET` | *(long random string)* |
+| `GOOGLE_API_KEY` | *(Gemini API key)* |
+| `PINECONE_API_KEY` | *(Pinecone API key)* |
+| `PINECONE_INDEX_NAME` | *(Pinecone index name)* |
+
+> ⚠️ Environment variable changes require a **redeploy** (`vercel --prod`) to take effect.
+
+### Step 3: Google Cloud Console OAuth Setup
+
+In the Google Cloud project that owns the OAuth client:
+
+1. Go to **APIs & Services → Credentials → OAuth 2.0 Client ID**.
+2. Under **Authorized JavaScript origins**, add:
+   - `http://localhost:5173` (local dev)
+   - `https://pdf-genius-theta.vercel.app` (production)
+3. Under **Authorized redirect URIs**, add both callback URLs (they must match `GOOGLE_CALLBACK_URL` **exactly**, per environment):
+   - `http://localhost:5173/api/auth/google/callback`
+   - `https://pdf-genius-theta.vercel.app/api/auth/google/callback`
+4. Save. New redirect URIs can take **5 minutes to a few hours** to propagate.
+
+### Troubleshooting Google Login
+
+| Symptom | Cause / Fix |
+|---|---|
+| `Error 400: redirect_uri_mismatch` | The `GOOGLE_CALLBACK_URL` the server sends doesn't exactly match a URI registered in Google Cloud Console — or the URI was just added and hasn't propagated yet. |
+| `Internal Server Error` on callback | Usually `TokenError: The provided client secret is invalid` — check `vercel logs <deployment-url>` and re-set `GOOGLE_CLIENT_SECRET` (paste carefully; avoid trailing newlines: `printf '%s' "$SECRET" \| vercel env add GOOGLE_CLIENT_SECRET production`). |
+| `Google OAuth is not configured on the server` | One of `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, or `GOOGLE_CALLBACK_URL` is missing in Vercel env vars. |
 
 ### Note on CORS
-Ensure that in `server/server.js`, your CORS configuration allows requests from your Vercel frontend URL:
+
+In `server/server.js`, CORS is locked to `CLIENT_URL` with credentials enabled (needed for the httpOnly JWT cookie):
+
 ```javascript
-app.use(cors({ 
-  origin: process.env.CLIENT_URL, // e.g., https://pdf-genius.vercel.app
-  credentials: true 
+app.use(cors({
+  origin: process.env.CLIENT_URL, // http://localhost:5173 locally, https://pdf-genius-theta.vercel.app in prod
+  credentials: true
 }));
 ```
+
+---
+
+## 👤 Developer
+
+**Aryan Sharma**
+
+- **GitHub:** [github.com/Aryns293](https://github.com/Aryns293) · **Repository:** [Aryns293/pdf-genius](https://github.com/Aryns293/pdf-genius)
+- **LinkedIn:** [linkedin.com/in/aryan-sharma-b88354287](https://www.linkedin.com/in/aryan-sharma-b88354287/)

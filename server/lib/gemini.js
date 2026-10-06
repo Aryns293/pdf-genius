@@ -44,44 +44,6 @@ async function generateWithFallback(operation) {
   throw lastError || new Error('All models failed');
 }
 
-export async function generateEmbedding(text) {
-  try {
-    const embeddingModel = getGenAI().getGenerativeModel({ model: 'text-embedding-004' });
-    const result = await embeddingModel.embedContent(text);
-    return result.embedding.values;
-  } catch (error) {
-    console.error('Error generating single embedding:', error);
-    throw error;
-  }
-}
-
-export async function generateEmbeddings(texts) {
-  try {
-    const embeddings = [];
-    const batchSize = 5;
-    
-    for (let i = 0; i < texts.length; i += batchSize) {
-      const batch = texts.slice(i, i + batchSize);
-      console.log(`Processing embedding batch ${Math.floor(i / batchSize) + 1} of ${Math.ceil(texts.length / batchSize)}...`);
-      
-      const batchResults = await Promise.all(
-        batch.map((text) => generateEmbedding(text))
-      );
-      
-      embeddings.push(...batchResults);
-      
-      if (i + batchSize < texts.length) {
-        await new Promise((resolve) => setTimeout(resolve, 500)); 
-      }
-    }
-    
-    return embeddings;
-  } catch (error) {
-    console.error('Error generating embeddings:', error);
-    throw new Error(`Failed to generate embeddings: ${error.message}`);
-  }
-}
-
 export async function generateResponse(question, context) {
   try {
     const contextText = context.join('\n\n');

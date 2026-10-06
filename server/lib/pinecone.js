@@ -24,31 +24,6 @@ async function getIndex() {
   }
 }
 
-export async function upsertVectors(chunks, embeddings) {
-  try {
-    const index = await getIndex();
-    const vectors = chunks.map((chunk, i) => ({
-      id: chunk.id,
-      values: embeddings[i],
-      metadata: {
-        text: chunk.text,
-        userId: chunk.metadata.userId,
-        fileName: chunk.metadata.fileName,
-        pageNumber: chunk.metadata.pageNumber,
-        chunkIndex: chunk.metadata.chunkIndex,
-        uploadedAt: chunk.metadata.uploadedAt,
-      },
-    }));
-    const batchSize = 100;
-    for (let i = 0; i < vectors.length; i += batchSize) {
-      await index.upsert(vectors.slice(i, i + batchSize));
-    }
-  } catch (error) {
-    console.error('Error upserting vectors:', error);
-    throw new Error('Failed to upsert vectors to Pinecone');
-  }
-}
-
 export async function upsertRecords(chunks) {
   try {
     const index = await getIndex();
@@ -71,33 +46,6 @@ export async function upsertRecords(chunks) {
   }
 }
 
-export async function queryVectors(queryEmbedding, userId, topK = 5) {
-  try {
-    const index = await getIndex();
-    const response = await index.query({
-      vector: queryEmbedding,
-      topK,
-      includeMetadata: true,
-      filter: { userId: { $eq: userId } },
-    });
-    return (response.matches || []).map((m) => ({
-      id: m.id,
-      text: m.metadata?.text || '',
-      score: m.score || 0,
-      metadata: {
-        userId: m.metadata?.userId || '',
-        fileName: m.metadata?.fileName || '',
-        pageNumber: m.metadata?.pageNumber || 0,
-        chunkIndex: m.metadata?.chunkIndex || 0,
-        uploadedAt: m.metadata?.uploadedAt || '',
-      },
-    }));
-  } catch (error) {
-    console.error('Error querying vectors:', error);
-    throw new Error('Failed to query vectors from Pinecone');
-  }
-}
-
 export async function searchRecords(question, userId, topK = 5) {
   try {
     const index = await getIndex();
@@ -110,9 +58,9 @@ export async function searchRecords(question, userId, topK = 5) {
       fields: ['text', 'userId', 'fileName', 'pageNumber', 'chunkIndex', 'uploadedAt'],
     });
     return (response.result?.hits || []).map((hit) => ({
-      id: hit.id,
+      id: hit._id,
       text: hit.fields?.text || '',
-      score: hit.score || 0,
+      score: hit._score || 0,
       metadata: {
         userId: hit.fields?.userId || '',
         fileName: hit.fields?.fileName || '',

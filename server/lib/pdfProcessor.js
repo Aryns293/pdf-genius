@@ -2,23 +2,46 @@ import pdfParse from 'pdf-parse/lib/pdf-parse.js';
 
 const DEBUG = process.env.NODE_ENV === 'development';
 
-export async function extractTextFromPDF(buffer) {
-  try {
-    if (DEBUG) console.log('📖 Starting PDF text extraction...');
-    if (!buffer || buffer.length === 0) throw new Error('Invalid or empty PDF buffer');
-    const pdfHeader = buffer.toString('ascii', 0, 4);
-    if (pdfHeader !== '%PDF') throw new Error('Invalid PDF file: Missing PDF header');
-
-    const data = await pdfParse(buffer);
-    if (data && data.text && data.text.trim().length > 0) {
-      if (DEBUG) console.log('✅ Successfully extracted text');
-      return data.text;
+function renderPage(pageData) {
+  return pageData.getTextContent({ normalizeWhitespace: false, disableCombineTextItems: false }).then((textContent) => {
+    let lastY;
+    let text = '';
+    for (const item of textContent.items) {
+      if (lastY === undefined || lastY === item.transform[5]) {
+        text += item.str;
+      } else {
+        text += '\n' + item.str;
+      }
+      lastY = item.transform[5];
     }
+    return text;
+  });
+}
+
+export async function extractPagesFromPDF(buffer) {
+  if (DEBUG) console.log('📖 Starting PDF page extraction...');
+  if (!buffer || buffer.length === 0) throw new Error('Invalid or empty PDF buffer');
+  if (buffer.toString('ascii', 0, 4) !== '%PDF') throw new Error('Invalid PDF file: Missing PDF header');
+
+  const pages = new Map();
+
+  await pdfParse(buffer, {
+    pagerender: async (pageData) => {
+      const text = await renderPage(pageData);
+      const pageNumber = pageData.pageNumber ?? pageData.pageIndex + 1 ?? pages.size + 1;
+      pages.set(pageNumber, text);
+      return text;
+    },
+  });
+
+  if (pages.size === 0) {
     throw new Error('Failed to extract text from PDF. The file might be password protected, corrupted, or contain only images.');
-  } catch (error) {
-    if (DEBUG) console.error('❌ PDF extraction error:', error);
-    throw new Error(`PDF text extraction failed: ${error.message}`);
   }
+
+  if (DEBUG) console.log(`✅ Extracted ${pages.size} page(s)`);
+  return [...pages.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([pageNumber, text]) => ({ pageNumber, text }));
 }
 
 export function cleanText(text) {
@@ -26,43 +49,61 @@ export function cleanText(text) {
   return text
     .replace(/\s+/g, ' ')
     .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
-    .replace(/\r\n/g, '\n')
-    .replace(/\r/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
 
-export function splitTextIntoChunks(text, chunkSize = 1000, overlap = 200) {
-  if (!text || text.trim().length === 0) return [];
-  const chunks = [];
-  const sentences = text.split(/(?<=[.!?])\s+(?=[A-Z])/).filter((s) => s.trim().length > 0);
-  let currentChunk = '';
-  let currentChunkIndex = 0;
-  let currentPageNumber = 1;
-  const avgCharsPerPage = 2500;
+function splitIntoSentences(text) {
+  return text.split(/(?<=[.!?])\s+(?=[A-Z])/).filter((s) => s.trim().length > 0).map((s) => s.trim());
+}
 
-  for (let i = 0; i < sentences.length; i++) {
-    const sentence = sentences[i].trim();
-    if (!sentence) continue;
-
-    if (currentChunk.length + sentence.length + 1 > chunkSize && currentChunk.length > 0) {
-      chunks.push({ text: currentChunk.trim(), pageNumber: currentPageNumber, chunkIndex: currentChunkIndex });
-      const words = currentChunk.split(/\s+/);
-      const overlapWords = Math.min(Math.floor(overlap / 6), words.length);
-      const overlapText = words.slice(-overlapWords).join(' ');
-      currentChunk = overlapText ? overlapText + ' ' + sentence : sentence;
-      currentChunkIndex++;
+// Tables, URLs and reference lists can produce a single "sentence" far longer than the chunk budget.
+function splitLongSentence(sentence, limit) {
+  const parts = [];
+  let buffer = '';
+  for (const word of sentence.split(/\s+/)) {
+    if (buffer && buffer.length + word.length + 1 > limit) {
+      parts.push(buffer);
+      buffer = word;
     } else {
-      currentChunk += (currentChunk ? ' ' : '') + sentence;
+      buffer += (buffer ? ' ' : '') + word;
+    }
+  }
+  if (buffer) parts.push(buffer);
+  return parts;
+}
+
+function overlapTail(chunk, overlapWords) {
+  const words = chunk.split(/\s+/);
+  const tail = words.slice(-overlapWords).join(' ');
+  return tail && tail.length < chunk.length ? tail : '';
+}
+
+// Chunks never cross a page boundary, so every chunk carries the page it actually came from.
+export function splitPagesIntoChunks(pages, chunkSize = 1000, overlap = 200) {
+  const chunks = [];
+  const overlapWords = Math.max(1, Math.floor(overlap / 6));
+
+  for (const page of pages) {
+    const text = cleanText(page.text);
+    if (!text) continue;
+
+    const units = splitIntoSentences(text).flatMap((s) => (s.length > chunkSize ? splitLongSentence(s, chunkSize) : [s]));
+    let current = '';
+
+    for (const unit of units) {
+      if (current && current.length + unit.length + 1 > chunkSize) {
+        chunks.push({ text: current.trim(), pageNumber: page.pageNumber, chunkIndex: chunks.length });
+        current = overlapTail(current.trim(), overlapWords);
+      }
+      current += (current ? ' ' : '') + unit;
     }
 
-    const totalChars = chunks.reduce((s, c) => s + c.text.length, 0) + currentChunk.length;
-    currentPageNumber = Math.max(1, Math.ceil(totalChars / avgCharsPerPage));
+    if (current.trim()) {
+      chunks.push({ text: current.trim(), pageNumber: page.pageNumber, chunkIndex: chunks.length });
+    }
   }
 
-  if (currentChunk.trim().length > 0) {
-    chunks.push({ text: currentChunk.trim(), pageNumber: currentPageNumber, chunkIndex: currentChunkIndex });
-  }
   return chunks;
 }
 
@@ -71,19 +112,13 @@ export async function processPDFToChunks(buffer, chunkSize = 1000, overlap = 200
     if (DEBUG) console.log('🔄 Processing PDF to chunks...');
     if (!buffer || buffer.length === 0) throw new Error('Invalid PDF buffer provided');
 
-    const text = await extractTextFromPDF(buffer);
-    if (text.length === 0) throw new Error('No text content found in PDF');
+    const pages = await extractPagesFromPDF(buffer);
+    const chunks = splitPagesIntoChunks(pages, chunkSize, overlap);
 
-    const cleanedText = cleanText(text);
-    if (cleanedText.length === 0) throw new Error('No valid text content after cleaning');
+    if (chunks.length === 0) throw new Error('No text content found in PDF');
+    if (DEBUG) console.log(`✅ Created ${chunks.length} chunk(s) across ${new Set(chunks.map((c) => c.pageNumber)).size} page(s)`);
 
-    const chunks = splitTextIntoChunks(cleanedText, chunkSize, overlap);
-    if (chunks.length === 0) throw new Error('Failed to create text chunks from PDF content');
-
-    const validChunks = chunks.filter((c) => c.text && c.text.trim().length > 0);
-    if (validChunks.length === 0) throw new Error('All created chunks are empty');
-
-    return validChunks;
+    return chunks;
   } catch (error) {
     if (DEBUG) console.error('❌ Processing error:', error);
     if (error.message?.includes('Invalid PDF')) throw new Error('The uploaded file is not a valid PDF document');

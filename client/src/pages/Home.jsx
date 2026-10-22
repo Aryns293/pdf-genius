@@ -22,7 +22,9 @@ export default function Home() {
       if (response.ok) {
         const data = await response.json();
         setUploadedFiles(data.files || []);
-        setFileStats({ count: data.count || 0, totalChunks: data.totalChunks || 0 });
+        const nextStats = { count: data.count || 0, totalChunks: data.totalChunks || 0 };
+        setFileStats(nextStats);
+        window.dispatchEvent(new CustomEvent('pdfgenius:files-changed', { detail: nextStats }));
       }
     } catch (err) {
       console.error('Failed to fetch files:', err);

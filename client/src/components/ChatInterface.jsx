@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Send, Bot, User, FileText, Loader2 } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 export default function ChatInterface({ onError }) {
   const [messages, setMessages] = useState([]);
@@ -91,7 +93,22 @@ export default function ChatInterface({ onError }) {
                     ? 'text-black shadow-md'
                     : 'bg-white border border-gray-200 text-gray-800 shadow-sm'
                 }`}>
-                  <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
+                  {message.type === 'assistant' ? (
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      components={{
+                        p: ({ children }) => <p className="mb-3 last:mb-0 leading-relaxed">{children}</p>,
+                        ul: ({ children }) => <ul className="mb-3 last:mb-0 ml-5 list-disc space-y-1">{children}</ul>,
+                        ol: ({ children }) => <ol className="mb-3 last:mb-0 ml-5 list-decimal space-y-1">{children}</ol>,
+                        strong: ({ children }) => <strong className="font-semibold text-gray-900">{children}</strong>,
+                        a: ({ children, href }) => <a href={href} target="_blank" rel="noreferrer" className="text-blue-600 underline">{children}</a>,
+                      }}
+                    >
+                      {message.content}
+                    </ReactMarkdown>
+                  ) : (
+                    <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
+                  )}
 
                   {message.sources && message.sources.length > 0 && (
                     <div className="mt-4">

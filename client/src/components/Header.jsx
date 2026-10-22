@@ -11,6 +11,12 @@ export default function Header() {
     if (user) fetchFileStats();
   }, [user]);
 
+  useEffect(() => {
+    const updateFileStats = (event) => setFileStats(event.detail);
+    window.addEventListener('pdfgenius:files-changed', updateFileStats);
+    return () => window.removeEventListener('pdfgenius:files-changed', updateFileStats);
+  }, []);
+
   const fetchFileStats = async () => {
     if (!user) return;
     setIsLoading(true);

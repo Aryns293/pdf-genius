@@ -13,13 +13,25 @@ router.post('/', authenticate, async (req, res) => {
     if (!question || typeof question !== 'string') return res.status(400).json({ error: 'Question is required' });
     if (question.trim().length === 0) return res.status(400).json({ error: 'Question cannot be empty' });
 
-    const relevantChunks = await searchRecords(question, userId, 5);
+    const searchResults = await searchRecords(question, userId, 20);
+    const relevantChunks = [];
+    const seenChunks = new Set();
+
+    for (const chunk of searchResults) {
+      const key = `${chunk.metadata.fileName}\0${chunk.metadata.pageNumber}\0${chunk.text.trim()}`;
+      if (seenChunks.has(key)) continue;
+      seenChunks.add(key);
+      relevantChunks.push(chunk);
+      if (relevantChunks.length === 8) break;
+    }
 
     if (relevantChunks.length === 0) {
       return res.status(404).json({ error: 'No relevant content found. Please upload a PDF document first.' });
     }
 
-    const context = relevantChunks.map((c) => c.text);
+    const context = relevantChunks.map(
+      (chunk, index) => `[Source ${index + 1}: ${chunk.metadata.fileName}, page ${chunk.metadata.pageNumber}]\n${chunk.text}`
+    );
     const answer = await generateResponse(question, context);
 
     return res.json({

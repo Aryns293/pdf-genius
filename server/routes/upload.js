@@ -2,7 +2,7 @@ import express from 'express';
 import multer from 'multer';
 import { authenticate } from '../middleware/auth.js';
 import { processPDFToChunks, generateChunkId, validatePDFBuffer } from '../lib/pdfProcessor.js';
-import { upsertRecords } from '../lib/pinecone.js';
+import { deleteVectors, upsertRecords } from '../lib/pinecone.js';
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -48,6 +48,7 @@ router.post('/', authenticate, upload.single('file'), async (req, res) => {
     }));
 
     try {
+      await deleteVectors(userId, fileName);
       await upsertRecords(pdfChunks);
     } catch (error) {
       return res.status(500).json({ error: 'Failed to store PDF records in database', details: error.message });

@@ -1,6 +1,8 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-const modelNames = ['gemini-3.8-flash', 'gemini-3.5-flash'];
+// gemini-3.8-flash can accept generateContent requests without ever responding.
+const modelNames = ['gemini-3.5-flash', 'gemini-3.7-flash'];
+const REQUEST_TIMEOUT_MS = 30000;
 let genAI;
 
 function getGenAI() {
@@ -19,8 +21,10 @@ async function retryWithBackoff(fn, maxRetries = 3, baseDelay = 1000) {
       return await fn();
     } catch (error) {
       const isLast = attempt === maxRetries;
+      const aborted = error?.name === 'GoogleGenerativeAIAbortError';
       const retryable = error?.status === 503 || error?.status === 429 || error?.message?.includes('overloaded');
-      if (isLast || !retryable) throw error;
+      // Fail over immediately when an endpoint times out instead of retrying it.
+      if (isLast || aborted || !retryable) throw error;
       const delay = baseDelay * Math.pow(2, attempt - 1);
       console.log(`Attempt ${attempt} failed, retrying in ${delay}ms...`);
       await new Promise((r) => setTimeout(r, delay));
@@ -47,8 +51,12 @@ async function generateWithFallback(operation) {
 export async function generateResponse(question, context) {
   try {
     const contextText = context.join('\n\n');
-    const prompt = `Based on the following context from PDF documents, answer the user's question.
-If the answer cannot be found in the context, say so clearly.
+    const prompt = `Answer the user's question using only the supplied document context.
+For factual questions, state only facts supported by the context.
+For analytical questions asking for a summary, recommendation, classification, suitability, or likely fit, make reasonable inferences from the available evidence and clearly present them as analysis rather than explicit document claims.
+If formal work experience is not listed, say that directly but mention relevant projects or activities when useful.
+If the context is insufficient, explain what information is missing.
+Avoid generic lead-ins such as "Based on the provided context". Respond concisely in Markdown.
 
 Context:
 ${contextText}
@@ -56,12 +64,14 @@ ${contextText}
 Question: ${question}
 
 Answer:`;
-    const result = await generateWithFallback((m) => m.generateContent(prompt));
+    const result = await generateWithFallback((m) => m.generateContent(prompt, { timeout: REQUEST_TIMEOUT_MS }));
     const response = await result.response;
     return response.text();
   } catch (error) {
     console.error('Error generating response:', error);
-    if (error.message?.includes('overloaded') || error.message?.includes('503')) {
+    if (error.name === 'GoogleGenerativeAIAbortError') {
+      throw new Error('The AI service timed out. Please try again in a few moments.');
+    } else if (error.message?.includes('overloaded') || error.message?.includes('503')) {
       throw new Error('The AI service is currently overloaded. Please try again in a few moments.');
     } else if (error.message?.includes('429')) {
       throw new Error('Rate limit exceeded. Please wait a moment before trying again.');

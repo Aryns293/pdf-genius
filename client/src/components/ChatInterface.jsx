@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, FileText, Loader2 } from 'lucide-react';
+import { Send, Bot, User, FileText, Loader2, RefreshCw } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -14,22 +14,8 @@ export default function ChatInterface({ onError }) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!inputValue.trim() || isLoading) return;
-
-    const question = inputValue.trim();
-    setInputValue('');
+  const askQuestion = async (question) => {
     setIsLoading(true);
-
-    const userMessage = {
-      id: Date.now().toString(),
-      type: 'user',
-      content: question,
-      timestamp: new Date(),
-    };
-    setMessages((prev) => [...prev, userMessage]);
-
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL || ""}/api/query`, {
         method: 'POST',
@@ -54,14 +40,37 @@ export default function ChatInterface({ onError }) {
         ...prev,
         {
           id: (Date.now() + 1).toString(),
-          type: 'assistant',
-          content: `Sorry, I encountered an error: ${errorMsg}`,
+          type: 'error',
+          content: errorMsg,
+          question,
           timestamp: new Date(),
         },
       ]);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!inputValue.trim() || isLoading) return;
+
+    const question = inputValue.trim();
+    setInputValue('');
+
+    const userMessage = {
+      id: Date.now().toString(),
+      type: 'user',
+      content: question,
+      timestamp: new Date(),
+    };
+    setMessages((prev) => [...prev, userMessage]);
+    await askQuestion(question);
+  };
+
+  const handleRetry = async (messageId, question) => {
+    setMessages((prev) => prev.filter((m) => m.id !== messageId));
+    await askQuestion(question);
   };
 
   const toggleSources = (messageId) => {
@@ -82,12 +91,25 @@ export default function ChatInterface({ onError }) {
           <>
             {messages.map((message) => (
               <div key={message.id} className={`flex gap-4 ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
-                {message.type === 'assistant' && (
+                {message.type !== 'user' && (
                   <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 shadow-md">
                     <Bot className="w-5 h-5 text-gray-700" />
                   </div>
                 )}
 
+                {message.type === 'error' ? (
+                  <div className="max-w-[75%] rounded-2xl px-6 py-4 bg-red-50 border border-red-200 text-red-800 shadow-sm">
+                    <p className="leading-relaxed">{message.content}</p>
+                    <button
+                      onClick={() => handleRetry(message.id, message.question)}
+                      disabled={isLoading}
+                      className="mt-3 inline-flex items-center gap-2 text-sm font-medium text-red-700 hover:text-red-900 bg-red-100 hover:bg-red-200 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                      Retry
+                    </button>
+                  </div>
+                ) : (
                 <div className={`max-w-[75%] rounded-2xl px-6 py-4 ${
                   message.type === 'user'
                     ? 'text-black shadow-md'
@@ -140,6 +162,7 @@ export default function ChatInterface({ onError }) {
                     </div>
                   )}
                 </div>
+                )}
 
                 {message.type === 'user' && (
                   <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 shadow-md">

@@ -1,7 +1,15 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // gemini-3.8-flash can accept generateContent requests without ever responding.
-const modelNames = ['gemini-3.5-flash', 'gemini-3.7-flash'];
+// Models from different families have independent rate-limit pools on the free tier,
+// so spreading across families maximises availability under quota pressure.
+const modelNames = [
+  'gemini-3.5-flash',
+  'gemini-3.7-flash',
+  'gemini-3.6-flash',
+  'gemini-3-flash-preview',
+  'gemini-3.5-flash-lite',
+];
 const REQUEST_TIMEOUT_MS = 30000;
 let genAI;
 
@@ -15,7 +23,7 @@ function getGenAI() {
   return genAI;
 }
 
-async function retryWithBackoff(fn, maxRetries = 3, baseDelay = 1000) {
+async function retryWithBackoff(fn, maxRetries = 2, baseDelay = 2000) {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       return await fn();
@@ -24,7 +32,10 @@ async function retryWithBackoff(fn, maxRetries = 3, baseDelay = 1000) {
       const aborted = error?.name === 'GoogleGenerativeAIAbortError';
       const retryable = error?.status === 503 || error?.status === 429 || error?.message?.includes('overloaded');
       // Fail over immediately when an endpoint times out instead of retrying it.
-      if (isLast || aborted || !retryable) throw error;
+      // For 429 rate limits, fail over to the next model quickly — a different
+      // model family usually has an independent quota pool.
+      const rateLimited = error?.status === 429;
+      if (isLast || aborted || !retryable || rateLimited) throw error;
       const delay = baseDelay * Math.pow(2, attempt - 1);
       console.log(`Attempt ${attempt} failed, retrying in ${delay}ms...`);
       await new Promise((r) => setTimeout(r, delay));

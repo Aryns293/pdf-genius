@@ -129,7 +129,7 @@ export async function processPDFToChunks(buffer, chunkSize = 1000, overlap = 200
 
 export function generateChunkId(userId, fileName, chunkIndex) {
   const sanitized = fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
-  return `${userId}-${sanitized}-${chunkIndex}-${Date.now()}`;
+  return `${userId}-${sanitized}-${chunkIndex}`;
 }
 
 export function validatePDFBuffer(buffer) {

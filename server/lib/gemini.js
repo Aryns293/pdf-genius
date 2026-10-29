@@ -4,11 +4,10 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 // Models from different families have independent rate-limit pools on the free tier,
 // so spreading across families maximises availability under quota pressure.
 const modelNames = [
-  'gemini-3.5-flash',
-  'gemini-3.7-flash',
-  'gemini-3.6-flash',
-  'gemini-3-flash-preview',
-  'gemini-3.5-flash-lite',
+  'gemini-3.8-flash',        // Current highest priority
+  'gemini-3.6-flash',        // Current fallback
+  'gemini-3-flash-preview',  // Keep as preview fallback
+  'gemini-3.5-flash-lite',   // Keep as lightweight fallback
 ];
 const REQUEST_TIMEOUT_MS = 30000;
 let genAI;

@@ -93,7 +93,7 @@ export async function getAllUserFiles(userId) {
     const response = await index.searchRecords({
       query: {
         inputs: { text: 'document file pdf content' },
-        topK: 10000,
+        topK: 1000,
         filter: { userId: { $eq: userId } },
       },
       fields: ['fileName'],

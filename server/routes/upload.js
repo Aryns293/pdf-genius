@@ -31,7 +31,6 @@ router.post('/', authenticate, upload.single('file'), async (req, res) => {
       return res.status(400).json({
         error: 'Failed to process PDF',
         details: error.message,
-        troubleshooting: 'Visit /diagnostic to run system diagnostics',
       });
     }
 

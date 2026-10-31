@@ -16,7 +16,7 @@ Built by **Aryan Sharma**.
 
 - **Frontend:** React, Vite, Tailwind CSS, Lucide Icons
 - **Backend:** Node.js, Express, Passport.js (Google OAuth)
-- **AI & Vector DB:** Google Generative AI (Gemini `text-embedding-004` & `gemini-2.5-flash`), Pinecone Vector Database
+- **AI & Vector DB:** Google Gemini multi-model response generation, Pinecone Vector Database with integrated embeddings
 - **Processing:** `pdf-parse` for text extraction and intelligent chunking
 - **Hosting:** Vercel (static frontend + Express as a serverless function)
 
@@ -44,7 +44,7 @@ pdf-genius/
 │   ├── middleware/auth.js    # JWT cookie verification
 │   ├── routes/               # auth.js, upload.js, query.js, files.js
 │   ├── env.js                # dotenv loader
-│   └── server.js             # Express app (listens on :5001 locally; skipped on Vercel)
+│   └── server.js             # Express app (PORT env var; defaults to :5000, local setup uses :5001)
 ├── vercel.json               # Rewrites: /api/* → api/index.js, /* → client/dist/index.html
 └── package.json              # Root scripts: build (client) and start (server)
 ```

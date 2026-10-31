@@ -90,22 +90,29 @@ export async function deleteVectors(userId, fileName) {
 export async function getAllUserFiles(userId) {
   try {
     const index = await getIndex();
-    const response = await index.searchRecords({
-      query: {
-        inputs: { text: 'document file pdf content' },
-        topK: 1000,
-        filter: { userId: { $eq: userId } },
-      },
-      fields: ['fileName'],
-    });
     const fileNames = new Set();
     let totalChunks = 0;
-    (response.result?.hits || []).forEach((hit) => {
-      if (hit.fields?.fileName) {
-        fileNames.add(hit.fields.fileName);
-        totalChunks++;
+    let paginationToken;
+
+    do {
+      const options = { prefix: `${userId}-`, limit: 100 };
+      if (paginationToken) options.paginationToken = paginationToken;
+
+      const listResponse = await index.listPaginated(options);
+      const ids = (listResponse.vectors || []).map((vector) => vector.id).filter(Boolean);
+
+      if (ids.length > 0) {
+        const fetchResponse = await index.fetch(ids);
+        Object.values(fetchResponse.records || {}).forEach((record) => {
+          if (record.metadata?.userId !== userId) return;
+          totalChunks++;
+          if (record.metadata?.fileName) fileNames.add(record.metadata.fileName);
+        });
       }
-    });
+
+      paginationToken = listResponse.pagination?.next;
+    } while (paginationToken);
+
     return { files: Array.from(fileNames), totalChunks };
   } catch (error) {
     console.error('Error getting user files:', error);

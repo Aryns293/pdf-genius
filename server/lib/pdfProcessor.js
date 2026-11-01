@@ -47,9 +47,8 @@ export async function extractPagesFromPDF(buffer) {
 export function cleanText(text) {
   if (!text || typeof text !== 'string') return '';
   return text
-    .replace(/\s+/g, ' ')
     .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
-    .replace(/\n{3,}/g, '\n\n')
+    .replace(/\s+/g, ' ')
     .trim();
 }
 

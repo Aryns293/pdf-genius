@@ -31,10 +31,7 @@ export default function Home() {
     }
   };
 
-  const handleUploadSuccess = (fileName) => {
-    setUploadedFiles((prev) => [...prev, fileName]);
-    setFileStats((prev) => ({ count: prev.count + 1, totalChunks: prev.totalChunks + 1 }));
-    setActiveTab('chat');
+  const handleUploadSuccess = () => {
     setError(null);
     setTimeout(fetchUserFiles, 1000);
   };
@@ -44,8 +41,6 @@ export default function Home() {
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL || ""}/api/files?fileName=${encodeURIComponent(fileName)}`, { method: 'DELETE' });
       if (response.ok) {
-        setUploadedFiles((prev) => prev.filter((n) => n !== fileName));
-        setFileStats((prev) => ({ count: Math.max(0, prev.count - 1), totalChunks: Math.max(0, prev.totalChunks - 1) }));
         setTimeout(fetchUserFiles, 500);
       } else {
         const errorData = await response.json();

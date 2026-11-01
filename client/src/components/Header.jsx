@@ -5,33 +5,12 @@ import { useAuth } from '../context/AuthContext.jsx';
 export default function Header() {
   const { user, signOut } = useAuth();
   const [fileStats, setFileStats] = useState({ count: 0, totalChunks: 0 });
-  const [isLoading, setIsLoading] = useState(false);
-
-  useEffect(() => {
-    if (user) fetchFileStats();
-  }, [user]);
 
   useEffect(() => {
     const updateFileStats = (event) => setFileStats(event.detail);
     window.addEventListener('pdfgenius:files-changed', updateFileStats);
     return () => window.removeEventListener('pdfgenius:files-changed', updateFileStats);
   }, []);
-
-  const fetchFileStats = async () => {
-    if (!user) return;
-    setIsLoading(true);
-    try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || ""}/api/files`);
-      if (response.ok) {
-        const data = await response.json();
-        setFileStats({ count: data.count || 0, totalChunks: data.totalChunks || 0 });
-      }
-    } catch (error) {
-      console.error('Failed to fetch file stats:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   return (
     <header className="bg-white border-b border-gray-100 shadow-sm">
@@ -58,7 +37,7 @@ export default function Header() {
                       <FileText className="w-4 h-4 text-blue-600" />
                     </div>
                     <div className="text-center">
-                      <div className="text-sm font-semibold text-gray-900">{isLoading ? '...' : fileStats.count}</div>
+                      <div className="text-sm font-semibold text-gray-900">{fileStats.count}</div>
                       <div className="text-xs text-gray-500">docs</div>
                     </div>
                   </div>
@@ -70,7 +49,7 @@ export default function Header() {
                       <Hash className="w-4 h-4 text-green-600" />
                     </div>
                     <div className="text-center">
-                      <div className="text-sm font-semibold text-gray-900">{isLoading ? '...' : fileStats.totalChunks}</div>
+                      <div className="text-sm font-semibold text-gray-900">{fileStats.totalChunks}</div>
                       <div className="text-xs text-gray-500">chunks</div>
                     </div>
                   </div>

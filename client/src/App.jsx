@@ -20,7 +20,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={user ? <Home /> : <Login />} />
-      <Route path="/login" element={<Login />} />
+      <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

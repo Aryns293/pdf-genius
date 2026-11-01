@@ -73,12 +73,14 @@ Answer:`;
     return response.text();
   } catch (error) {
     console.error('Error generating response:', error);
-    if (error.name === 'GoogleGenerativeAIAbortError') {
+    if (['GoogleGenerativeAIAbortError', 'AbortError', 'TimeoutError'].includes(error.name)) {
       throw new Error('The AI service timed out. Please try again in a few moments.');
-    } else if (error.message?.includes('overloaded') || error.message?.includes('503')) {
+    } else if (error.message?.includes('overloaded') || error.message?.includes('503') || error.status === 503) {
       throw new Error('The AI service is currently overloaded. Please try again in a few moments.');
-    } else if (error.message?.includes('429')) {
+    } else if (error.message?.includes('429') || error.status === 429) {
       throw new Error('Rate limit exceeded. Please wait a moment before trying again.');
+    } else if (error.message?.includes('API key not valid')) {
+      throw new Error('API key not valid');
     }
     throw new Error('Failed to generate response');
   }

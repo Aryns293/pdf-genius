@@ -50,7 +50,10 @@ router.post('/', authenticate, async (req, res) => {
     let errorMessage = error.message;
     let statusCode = 500;
 
-    if (error.message?.includes('overloaded')) {
+    if (error.message?.includes('timed out')) {
+      errorMessage = 'The AI service timed out. Please try again in a few moments.';
+      statusCode = 504;
+    } else if (error.message?.includes('overloaded')) {
       errorMessage = 'The AI service is currently experiencing high demand. Please try again in a few moments.';
       statusCode = 503;
     } else if (error.message?.includes('Rate limit exceeded')) {

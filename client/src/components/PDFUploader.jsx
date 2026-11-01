@@ -68,7 +68,10 @@ export default function PDFUploader({ onUploadSuccess, onUploadError }) {
     setIsDragActive(false);
     if (e.dataTransfer.files?.[0]) handleFile(e.dataTransfer.files[0]);
   };
-  const handleFileInputChange = (e) => { if (e.target.files?.[0]) handleFile(e.target.files[0]); };
+  const handleFileInputChange = (e) => {
+    if (e.target.files?.[0]) handleFile(e.target.files[0]);
+    e.target.value = '';
+  };
   const handleClick = () => { if (!isUploading && fileInputRef.current) fileInputRef.current.click(); };
   const clearMessages = () => { setError(null); setSuccess(null); };
 

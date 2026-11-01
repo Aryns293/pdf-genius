@@ -112,7 +112,7 @@ export default function ChatInterface({ onError }) {
                 ) : (
                 <div className={`max-w-[75%] rounded-2xl px-6 py-4 ${
                   message.type === 'user'
-                    ? 'text-black shadow-md'
+                    ? 'bg-blue-50 border border-blue-100 text-gray-900 shadow-sm'
                     : 'bg-white border border-gray-200 text-gray-800 shadow-sm'
                 }`}>
                   {message.type === 'assistant' ? (

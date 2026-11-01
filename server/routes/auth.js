@@ -41,8 +41,12 @@ router.get(
 
 router.get('/me', authenticate, (req, res) => res.json({ user: req.user }));
 
-router.post('/logout', (req, res) => {
-  res.clearCookie('token');
+router.post('/logout', (_req, res) => {
+  res.clearCookie('token', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+  });
   res.json({ success: true });
 });
 

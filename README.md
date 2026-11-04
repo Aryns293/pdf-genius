@@ -6,7 +6,7 @@ Built by **Aryan Sharma**.
 
 ## 🚀 Features
 
-- **Smart PDF Uploads:** Drag-and-drop interface for uploading PDFs up to 10MB.
+- **Smart PDF Uploads:** Drag-and-drop interface for uploading PDFs up to 4MB, safely below Vercel's 4.5MB request-body limit.
 - **AI-Powered Chat:** Ask questions in natural language and get precise answers based on your documents.
 - **Source Citations:** Every answer includes exact references and page numbers from your original PDF.
 - **Secure Authentication:** Easy and secure Google OAuth integration.

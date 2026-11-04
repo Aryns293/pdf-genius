@@ -19,9 +19,9 @@ export default function PDFUploader({ onUploadSuccess, onUploadError }) {
         return;
       }
 
-      const maxSize = 10 * 1024 * 1024;
+      const maxSize = 4 * 1024 * 1024;
       if (file.size > maxSize) {
-        const msg = 'File too large. Maximum size is 10MB';
+        const msg = 'File too large. Maximum size is 4MB';
         setError(msg);
         onUploadError?.(msg);
         return;
@@ -112,7 +112,7 @@ export default function PDFUploader({ onUploadSuccess, onUploadError }) {
               ) : (
                 <div className="space-y-2">
                   <p className="text-gray-700 font-medium">Click to upload or drag and drop</p>
-                  <p className="text-sm text-gray-500">PDF files only (max 10MB)</p>
+                  <p className="text-sm text-gray-500">PDF files only (max 4MB)</p>
                 </div>
               )}
             </>

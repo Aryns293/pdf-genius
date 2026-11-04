@@ -5,7 +5,7 @@ import { processPDFToChunks, generateChunkId, validatePDFBuffer } from '../lib/p
 import { deleteVectors, upsertRecords } from '../lib/pinecone.js';
 
 const router = express.Router();
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 4 * 1024 * 1024 } });
 
 router.post('/', authenticate, upload.single('file'), async (req, res) => {
   console.log('📤 Upload API called');
@@ -76,7 +76,7 @@ router.post('/', authenticate, upload.single('file'), async (req, res) => {
 router.use((err, _req, res, next) => {
   if (err instanceof multer.MulterError) {
     if (err.code === 'LIMIT_FILE_SIZE') {
-      return res.status(400).json({ error: 'File too large. Maximum size is 10MB' });
+      return res.status(400).json({ error: 'File too large. Maximum size is 4MB' });
     }
     return res.status(400).json({ error: err.message });
   }

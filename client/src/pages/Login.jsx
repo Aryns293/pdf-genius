@@ -48,7 +48,7 @@ export default function Login() {
               icon={<Upload className="w-6 h-6 text-white" />}
               color="from-blue-500 to-blue-600"
               title="Smart Upload"
-              desc="Drag & drop PDF files up to 10MB with instant processing"
+              desc="Drag & drop PDF files up to 4MB with instant processing"
             />
             <FeatureCard
               icon={<Brain className="w-6 h-6 text-white" />}

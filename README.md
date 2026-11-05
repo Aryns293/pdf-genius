@@ -40,9 +40,10 @@ pdf-genius/
 │   └── vite.config.js        # Dev server on :5173, proxies /api → :5001
 ├── server/                   # Express backend (also runs as a serverless function)
 │   ├── config/passport.js    # Google OAuth strategy (registered only when env vars are set)
-│   ├── lib/                  # gemini.js, pdfProcessor.js, pinecone.js
-│   ├── middleware/auth.js    # JWT cookie verification
-│   ├── routes/               # auth.js, upload.js, query.js, files.js
+│   ├── controllers/          # HTTP handlers for auth, uploads, queries, and files
+│   ├── lib/                  # PDF utilities and Gemini/Pinecone integrations
+│   ├── middleware/           # Authentication, validation, multipart parsing, and query/upload errors
+│   ├── routes/               # Endpoint declarations composing middleware and controllers
 │   ├── env.js                # dotenv loader
 │   └── server.js             # Express app (PORT env var; defaults to :5000, local setup uses :5001)
 ├── vercel.json               # Rewrites: /api/* → api/index.js, /* → client/dist/index.html

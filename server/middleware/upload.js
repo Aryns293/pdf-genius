@@ -5,11 +5,12 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
     fileSize: 4 * 1024 * 1024, // 4 MB max file size
-    fields: 5,                  // max non-file fields
-    files: 1,                   // only 1 file per request
-    parts: 6,                   // fields + files combined
+    fields: 0,                  // no text fields expected
+    files: 1,                   // strictly 1 file per request
+    parts: 1,                   // exactly 1 part (the file itself)
     headerPairs: 20,            // max header key-value pairs
     fieldArrayIndexLimit: 100,  // prevent index-overflow DoS on array fields
+    fieldNestingDepth: 1,       // prevent prototype/nesting exhaustion attacks
   },
 });
 

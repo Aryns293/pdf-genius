@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenAI } from '@google/genai';
 
 const modelNames = [
   'gemini-3.8-flash',        // Primary flagship stable Flash model
@@ -14,7 +14,7 @@ function getGenAI() {
     throw new Error('Missing Google API key');
   }
   if (!genAI) {
-    genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
+    genAI = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY });
   }
   return genAI;
 }
@@ -25,7 +25,7 @@ async function retryWithBackoff(fn, maxRetries = 3, baseDelay = 2000) {
       return await fn();
     } catch (error) {
       const isLast = attempt === maxRetries;
-      const aborted = error?.name === 'GoogleGenerativeAIAbortError';
+      const aborted = error?.name === 'AbortError' || error?.name === 'TimeoutError';
       const retryable = error?.status === 503 || error?.status === 429 || error?.message?.includes('overloaded');
       const rateLimited = error?.status === 429;
       if (isLast || aborted || !retryable || rateLimited) throw error;
@@ -37,13 +37,22 @@ async function retryWithBackoff(fn, maxRetries = 3, baseDelay = 2000) {
   throw new Error('Max retries exceeded');
 }
 
-async function generateWithFallback(operation) {
+async function generateWithFallback(prompt) {
   let lastError = null;
+  const ai = getGenAI();
   for (const modelName of modelNames) {
     try {
-      const model = getGenAI().getGenerativeModel({ model: modelName });
       console.log(`Trying model: ${modelName}`);
-      return await retryWithBackoff(() => operation(model));
+      const response = await retryWithBackoff(() =>
+        ai.models.generateContent({
+          model: modelName,
+          contents: prompt,
+          config: {
+            httpOptions: { timeout: REQUEST_TIMEOUT_MS },
+          },
+        })
+      );
+      return response.text;
     } catch (err) {
       console.log(`Model ${modelName} failed:`, err.message);
       lastError = err;
@@ -68,18 +77,16 @@ ${contextText}
 Question: ${question}
 
 Answer:`;
-    const result = await generateWithFallback((m) => m.generateContent(prompt, { timeout: REQUEST_TIMEOUT_MS }));
-    const response = await result.response;
-    return response.text();
+    return await generateWithFallback(prompt);
   } catch (error) {
     console.error('Error generating response:', error);
-    if (['GoogleGenerativeAIAbortError', 'AbortError', 'TimeoutError'].includes(error.name)) {
+    if (['AbortError', 'TimeoutError'].includes(error.name)) {
       throw new Error('The AI service timed out. Please try again in a few moments.');
     } else if (error.message?.includes('overloaded') || error.message?.includes('503') || error.status === 503) {
       throw new Error('The AI service is currently overloaded. Please try again in a few moments.');
     } else if (error.message?.includes('429') || error.status === 429) {
       throw new Error('Rate limit exceeded. Please wait a moment before trying again.');
-    } else if (error.message?.includes('API key not valid')) {
+    } else if (error.message?.includes('API key not valid') || error.message?.includes('API_KEY_INVALID')) {
       throw new Error('API key not valid');
     }
     throw new Error('Failed to generate response');

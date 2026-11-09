@@ -1,7 +1,17 @@
 import multer from 'multer';
 import { validatePDFBuffer } from '../lib/pdfProcessor.js';
 
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 4 * 1024 * 1024 } });
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 4 * 1024 * 1024, // 4 MB max file size
+    fields: 5,                  // max non-file fields
+    files: 1,                   // only 1 file per request
+    parts: 6,                   // fields + files combined
+    headerPairs: 20,            // max header key-value pairs
+    fieldArrayIndexLimit: 100,  // prevent index-overflow DoS on array fields
+  },
+});
 
 export const parsePDFUpload = upload.single('file');
 

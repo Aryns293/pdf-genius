@@ -1,10 +1,11 @@
 import { useState, useCallback, useRef } from 'react';
-import { Upload, CheckCircle, AlertCircle, X } from 'lucide-react';
+import { Upload, CheckCircle, AlertCircle, AlertTriangle, X } from 'lucide-react';
 
 export default function PDFUploader({ onUploadSuccess, onUploadError }) {
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+  const [warnings, setWarnings] = useState([]);
   const [isDragActive, setIsDragActive] = useState(false);
   const fileInputRef = useRef(null);
 
@@ -30,6 +31,7 @@ export default function PDFUploader({ onUploadSuccess, onUploadError }) {
       setIsUploading(true);
       setError(null);
       setSuccess(null);
+      setWarnings([]);
 
       const formData = new FormData();
       formData.append('file', file);
@@ -47,6 +49,7 @@ export default function PDFUploader({ onUploadSuccess, onUploadError }) {
 
         const successMsg = `Successfully uploaded: ${result.fileName} (${result.chunksCreated} chunks created)`;
         setSuccess(successMsg);
+        setWarnings(result.warnings || []);
         onUploadSuccess?.(result.fileName);
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Upload failed';
@@ -73,7 +76,7 @@ export default function PDFUploader({ onUploadSuccess, onUploadError }) {
     e.target.value = '';
   };
   const handleClick = () => { if (!isUploading && fileInputRef.current) fileInputRef.current.click(); };
-  const clearMessages = () => { setError(null); setSuccess(null); };
+  const clearMessages = () => { setError(null); setSuccess(null); setWarnings([]); };
 
   return (
     <div className="w-full max-w-2xl mx-auto space-y-4">
@@ -127,6 +130,20 @@ export default function PDFUploader({ onUploadSuccess, onUploadError }) {
             <p className="text-green-800">{success}</p>
           </div>
           <button onClick={clearMessages} className="text-green-600 hover:text-green-800">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {warnings && warnings.length > 0 && (
+        <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+          <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+          <div className="flex-1 space-y-1">
+            {warnings.map((warn, idx) => (
+              <p key={idx} className="text-amber-800 text-sm">{warn}</p>
+            ))}
+          </div>
+          <button onClick={() => setWarnings([])} className="text-amber-600 hover:text-amber-800">
             <X className="w-4 h-4" />
           </button>
         </div>

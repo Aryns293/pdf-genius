@@ -28,14 +28,18 @@ export async function extractPagesFromPDF(buffer) {
   await pdfParse(buffer, {
     pagerender: async (pageData) => {
       const text = await renderPage(pageData);
-      const pageNumber = pageData.pageNumber ?? pageData.pageIndex + 1 ?? pages.size + 1;
+      const pageNumber = Number.isInteger(pageData.pageNumber)
+        ? pageData.pageNumber
+        : Number.isInteger(pageData.pageIndex)
+          ? pageData.pageIndex + 1
+          : pages.size + 1;
       pages.set(pageNumber, text);
       return text;
     },
   });
 
   if (pages.size === 0) {
-    throw new Error('Failed to extract text from PDF. The file might be password protected, corrupted, or contain only images.');
+    throw new Error('Failed to extract text from PDF. The file might be corrupted or contain only images.');
   }
 
   if (DEBUG) console.log(`✅ Extracted ${pages.size} page(s)`);
@@ -60,7 +64,19 @@ function splitIntoSentences(text) {
 function splitLongSentence(sentence, limit) {
   const parts = [];
   let buffer = '';
-  for (const word of sentence.split(/\s+/)) {
+  for (let word of sentence.split(/\s+/)) {
+    if (!word) continue;
+    // An extremely long word or URL can exceed the chunk limit on its own
+    while (word.length > limit) {
+      if (buffer) {
+        parts.push(buffer);
+        buffer = '';
+      }
+      parts.push(word.slice(0, limit));
+      word = word.slice(limit);
+    }
+    if (!word) continue;
+
     if (buffer && buffer.length + word.length + 1 > limit) {
       parts.push(buffer);
       buffer = word;
@@ -72,10 +88,33 @@ function splitLongSentence(sentence, limit) {
   return parts;
 }
 
-function overlapTail(chunk, overlapWords) {
+function overlapTail(chunk, overlapWords, maxOverlapChars) {
+  if (!overlapWords || overlapWords <= 0) return '';
   const words = chunk.split(/\s+/);
-  const tail = words.slice(-overlapWords).join(' ');
-  return tail && tail.length < chunk.length ? tail : '';
+  let tail = words.slice(-overlapWords).join(' ');
+  if (!tail || tail.length >= chunk.length) return '';
+  if (typeof maxOverlapChars === 'number' && maxOverlapChars > 0 && tail.length > maxOverlapChars) {
+    const tailWords = tail.split(/\s+/);
+    while (tailWords.length > 0 && tail.length > maxOverlapChars) {
+      tailWords.shift();
+      tail = tailWords.join(' ');
+    }
+  }
+  return tail;
+}
+
+function getValidOverlap(tail, unitLength, chunkSize) {
+  if (!tail) return '';
+  if (tail.length + 1 + unitLength <= chunkSize) return tail;
+  const words = tail.split(/\s+/);
+  while (words.length > 0) {
+    words.shift();
+    const candidate = words.join(' ');
+    if (candidate && candidate.length + 1 + unitLength <= chunkSize) {
+      return candidate;
+    }
+  }
+  return '';
 }
 
 // Chunks never cross a page boundary, so every chunk carries the page it actually came from.
@@ -84,7 +123,7 @@ function overlapTail(chunk, overlapWords) {
 export function splitPagesIntoChunks(pages, chunkSize = 1000, overlap = 200) {
   const chunks = [];
   const skippedPages = [];
-  const overlapWords = Math.max(1, Math.floor(overlap / 6));
+  const overlapWords = overlap > 0 ? Math.max(1, Math.floor(overlap / 6)) : 0;
 
   for (const page of pages) {
     const text = cleanText(page.text);
@@ -99,7 +138,8 @@ export function splitPagesIntoChunks(pages, chunkSize = 1000, overlap = 200) {
     for (const unit of units) {
       if (current && current.length + unit.length + 1 > chunkSize) {
         chunks.push({ text: current.trim(), pageNumber: page.pageNumber, chunkIndex: chunks.length });
-        current = overlapTail(current.trim(), overlapWords);
+        const tail = overlapTail(current.trim(), overlapWords, overlap);
+        current = getValidOverlap(tail, unit.length, chunkSize);
       }
       current += (current ? ' ' : '') + unit;
     }
@@ -132,7 +172,9 @@ export async function processPDFToChunks(buffer, chunkSize = 1000, overlap = 200
   } catch (error) {
     if (DEBUG) console.error('❌ Processing error:', error);
     if (error.message?.includes('Invalid PDF')) throw new Error('The uploaded file is not a valid PDF document');
-    if (error.message?.includes('password')) throw new Error('This PDF is password protected and cannot be processed');
+    if (error.name === 'PasswordException' || /password/i.test(error.message)) {
+      throw new Error('This PDF is password protected and cannot be processed');
+    }
     throw error;
   }
 }

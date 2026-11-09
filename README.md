@@ -6,7 +6,7 @@ Built by **Aryan Sharma**.
 
 ## 🚀 Features
 
-- **Smart PDF Uploads:** Drag-and-drop interface for uploading PDFs up to 4MB, safely below Vercel's 4.5MB request-body limit.
+- **Smart PDF Uploads:** Drag-and-drop interface for uploading PDFs up to 4MB, safely below Vercel's 4.5MB request-body limit (with detection and warnings for unreadable or image-only pages).
 - **AI-Powered Chat:** Ask questions in natural language and get precise answers based on your documents.
 - **Source Citations:** Every answer includes exact references and page numbers from your original PDF.
 - **Secure Authentication:** Easy and secure Google OAuth integration.
@@ -15,8 +15,8 @@ Built by **Aryan Sharma**.
 ## 🛠️ Tech Stack
 
 - **Frontend:** React, Vite, Tailwind CSS, Lucide Icons
-- **Backend:** Node.js, Express, Passport.js (Google OAuth)
-- **AI & Vector DB:** Google Gemini multi-model response generation, Pinecone Vector Database with integrated embeddings
+- **Backend:** Node.js (24.x), Express, Passport.js (Google OAuth)
+- **AI & Vector DB:** Google Gemini (`@google/genai` SDK with multi-model fallback), Pinecone Vector Database with integrated embeddings
 - **Processing:** `pdf-parse` for text extraction and intelligent chunking
 - **Hosting:** Vercel (static frontend + Express as a serverless function)
 
@@ -53,6 +53,10 @@ pdf-genius/
 ---
 
 ## 💻 Local Development Setup
+
+### Prerequisites
+- **Node.js:** `24.x` (or `>= 22.x` required by `@google/genai`)
+- **npm:** `10.x` or later
 
 ### 1. Clone the repository
 ```bash

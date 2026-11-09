@@ -79,13 +79,19 @@ function overlapTail(chunk, overlapWords) {
 }
 
 // Chunks never cross a page boundary, so every chunk carries the page it actually came from.
+// Returns { chunks, skippedPages } where skippedPages lists page numbers that yielded no text
+// (e.g. scanned-image pages in a mixed PDF).
 export function splitPagesIntoChunks(pages, chunkSize = 1000, overlap = 200) {
   const chunks = [];
+  const skippedPages = [];
   const overlapWords = Math.max(1, Math.floor(overlap / 6));
 
   for (const page of pages) {
     const text = cleanText(page.text);
-    if (!text) continue;
+    if (!text) {
+      skippedPages.push(page.pageNumber);
+      continue;
+    }
 
     const units = splitIntoSentences(text).flatMap((s) => (s.length > chunkSize ? splitLongSentence(s, chunkSize) : [s]));
     let current = '';
@@ -103,7 +109,7 @@ export function splitPagesIntoChunks(pages, chunkSize = 1000, overlap = 200) {
     }
   }
 
-  return chunks;
+  return { chunks, skippedPages };
 }
 
 export async function processPDFToChunks(buffer, chunkSize = 1000, overlap = 200) {
@@ -112,12 +118,17 @@ export async function processPDFToChunks(buffer, chunkSize = 1000, overlap = 200
     if (!buffer || buffer.length === 0) throw new Error('Invalid PDF buffer provided');
 
     const pages = await extractPagesFromPDF(buffer);
-    const chunks = splitPagesIntoChunks(pages, chunkSize, overlap);
+    const { chunks, skippedPages } = splitPagesIntoChunks(pages, chunkSize, overlap);
 
     if (chunks.length === 0) throw new Error('No text content found in PDF');
+
+    if (skippedPages.length > 0) {
+      console.warn(`⚠️  ${skippedPages.length} page(s) yielded no text (likely scanned images): pages ${skippedPages.join(', ')}`);
+    }
+
     if (DEBUG) console.log(`✅ Created ${chunks.length} chunk(s) across ${new Set(chunks.map((c) => c.pageNumber)).size} page(s)`);
 
-    return chunks;
+    return { chunks, totalPages: pages.length, skippedPages };
   } catch (error) {
     if (DEBUG) console.error('❌ Processing error:', error);
     if (error.message?.includes('Invalid PDF')) throw new Error('The uploaded file is not a valid PDF document');

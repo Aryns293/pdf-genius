@@ -8,9 +8,9 @@ export async function uploadPDF(req, res) {
     const fileName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
     const buffer = file.buffer;
 
-    let processedChunks;
+    let processedChunks, totalPages, skippedPages;
     try {
-      processedChunks = await processPDFToChunks(buffer);
+      ({ chunks: processedChunks, totalPages, skippedPages } = await processPDFToChunks(buffer));
       if (processedChunks.length === 0) throw new Error('No text content could be extracted from the PDF');
     } catch (error) {
       return res.status(400).json({
@@ -40,10 +40,17 @@ export async function uploadPDF(req, res) {
 
     const stats = {
       originalFileSize: file.size,
+      totalPages,
+      skippedPages: skippedPages.length,
       processedChunks: processedChunks.length,
       averageChunkSize: Math.round(processedChunks.reduce((s, c) => s + c.text.length, 0) / processedChunks.length),
       totalTextLength: processedChunks.reduce((s, c) => s + c.text.length, 0),
     };
+
+    // Surface a user-visible warning when some pages were image-only / unreadable
+    const warnings = skippedPages.length > 0
+      ? [`${skippedPages.length} page(s) could not be read (likely scanned images): pages ${skippedPages.join(', ')}. Only the remaining ${totalPages - skippedPages.length} page(s) were indexed.`]
+      : [];
 
     return res.json({
       success: true,
@@ -51,6 +58,7 @@ export async function uploadPDF(req, res) {
       chunksCreated: pdfChunks.length,
       fileName,
       processingStats: stats,
+      ...(warnings.length > 0 && { warnings }),
     });
   } catch (error) {
     console.error('Unexpected error:', error);

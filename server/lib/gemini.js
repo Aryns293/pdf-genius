@@ -4,7 +4,7 @@ const modelNames = [
   'gemini-3.8-flash',        // Primary flagship stable Flash model
   'gemini-3.6-flash',        // Secondary stable Flash fallback
   'gemini-3.5-flash-lite',   // High-throughput, low-latency stable fallback
-  'gemini-3-flash-preview',  // Independent preview quota pool fallback
+  'gemini-3-flash-preview',  // Final model fallback
 ];
 const REQUEST_TIMEOUT_MS = 30000;
 let genAI;
